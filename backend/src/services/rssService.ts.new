@@ -1,0 +1,74 @@
+export const processAndPostContent = async () => {
+  try {
+    console.log("Starting scheduled content processing...");
+    
+    // Step 1: Fetch RSS Feeds
+    const feeds = await getRSSFeeds();
+    console.log(`Successfully fetched ${feeds.length} feeds`);
+    
+    // Filter feeds to only include those published in the last 24 hours
+    const now = new Date();
+    const recentFeeds = feeds.filter(feed => {
+      const pubDate = new Date(feed.pubDate);
+      return (now.getTime() - pubDate.getTime()) < 24 * 60 * 60 * 1000;
+    });
+    
+    if (recentFeeds.length === 0) {
+      console.log("No recent feeds found; exiting scheduled processing.");
+      return;
+    }
+    
+    // Randomly select one recent feed
+    const feed = recentFeeds[Math.floor(Math.random() * recentFeeds.length)];
+    console.log(`Processing randomly selected feed: ${feed.title}`);
+    
+    // Prepare content for LLM
+    const cleanContent = (feed.contentSnippet || '')
+      .replace(/\n+/g, ' ')  // Replace newlines with spaces
+      .replace(/\s+/g, ' ')   // Normalize whitespace
+      .replace(/[^\x20-\x7E]/g, '') // Remove non-printable characters
+      .trim();
+    
+    if (!cleanContent || cleanContent.length < 50) {
+      console.log("Skipping feed due to insufficient content length");
+      return;
+    }
+    
+    // Limit content to a shorter length for LLM processing (1500 characters max)
+    const truncatedContent = cleanContent.substring(0, 1500);
+    
+    const content = `
+Please rewrite the following technology article in a clear and engaging way:
+
+Original Title: ${feed.title || 'Untitled'}
+Original Content: ${truncatedContent}
+Source URL: ${feed.link || 'No URL provided'}
+
+Instructions:
+1. Create a more engaging title that captures the main point
+2. Rewrite the content in a clear, professional style
+3. Keep all important technical details accurate
+4. Add 2-3 key takeaways as bullet points at the end
+5. Keep the response under 1000 words`;
+    
+    // Step 2: Rewrite Content with LLM
+    console.log("Sending to LLM for rewriting...");
+    const rewrittenContent = await rewriteContentWithLLM(content);
+    
+    // Step 3: Send to WhatsApp for Approval
+    console.log("Sending to WhatsApp for approval...");
+    const articleRequest = {
+      title: feed.title || 'Untitled',
+      content: rewrittenContent,
+      sourceUrl: feed.link || '',
+    };
+    
+    const messageId = await sendArticleForApproval(articleRequest);
+    console.log("Content sent for approval, message ID:", messageId);
+    console.log("Awaiting approval via WhatsApp webhook...");
+    
+  } catch (error) {
+    console.error("Error in scheduled processAndPostContent:", error instanceof Error ? error.message : "Unknown error");
+    throw error;
+  }
+};

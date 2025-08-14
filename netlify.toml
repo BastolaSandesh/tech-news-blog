@@ -1,0 +1,31 @@
+[build]
+  command = "npm install && npm run build"
+  publish = "dist"
+  # If Lovable AI generated a Vite/React app
+  command = "npm install && npm run build"
+  publish = "dist"
+
+  # If it’s Next.js with static export (uncomment these instead)
+  # command = "npm install && npm run build && npm run export"
+  # publish = "out"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# Redirect all 404s to index.html for SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Ensure correct MIME types for module scripts
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Content-Type = "application/javascript"
+
+# Optional: Cache static assets
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
