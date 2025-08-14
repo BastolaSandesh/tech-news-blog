@@ -1,20 +1,28 @@
-import { defineConfig } from "vite";
+import { defineConfig, Plugin, UserConfig } from "vite";
+import type { PluginContext, OutputOptions, OutputBundle } from 'rollup';
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
 import matter from "gray-matter";
 import { componentTagger } from "lovable-tagger";
 
-const makeFeedsPlugin = () => {
+interface BlogPost {
+  slug: string;
+  title: string;
+  date: string;
+  summary: string;
+}
+
+const makeFeedsPlugin = (): Plugin => {
   return {
     name: "generate-feeds",
     apply: "build",
-    generateBundle(this: any) {
+    generateBundle(this: PluginContext, _options: OutputOptions, _bundle: OutputBundle) {
       const baseUrl = process.env.SITE_URL || "https://your-domain.com";
       const contentDir = path.resolve(__dirname, "src/content/news");
       if (!fs.existsSync(contentDir)) return;
       const files = fs.readdirSync(contentDir).filter((f) => f.endsWith(".md"));
-      const posts = files
+      const posts: BlogPost[] = files
         .map((file) => {
           const raw = fs.readFileSync(path.join(contentDir, file), "utf-8");
           const { data } = matter(raw);
@@ -50,11 +58,10 @@ const makeFeedsPlugin = () => {
       this.emitFile({ type: "asset", fileName: "sitemap.xml", source: sitemap });
       this.emitFile({ type: "asset", fileName: "rss.xml", source: rss });
     },
-  } as const;
+  };
 };
 
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }): UserConfig => ({
   server: {
     host: "::",
     port: 8080,
@@ -80,7 +87,11 @@ export default defineConfig(({ mode }) => ({
       }
     }
   },
-  plugins: [react(), mode === "development" && componentTagger(), makeFeedsPlugin()].filter(Boolean) as any,
+  plugins: [
+    react(),
+    mode === "development" ? componentTagger() : null,
+    makeFeedsPlugin()
+  ].filter((plugin): plugin is Plugin => plugin !== null),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
